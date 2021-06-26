@@ -75,4 +75,110 @@ actions_dict = {'lights1': 'off', 'lights2': 'off', 'lights3': 'off',
 # CONSTRAINTS
 - The program should not run longer than 1800 seconds for 10 days (180s/day).
 
+# SMART BUILDING FLOOR PLAN
+
 ![Alt text](./Smart_building_floor_plan.png "Smart Building floor plan")
+
+# IMPLEMENTATION
+
+## HIDDEN MARKOV MODEL
+
+- is an instance of Dynamic Bayesian Networks (DBN).
+- They have a repeating structure that grows with time or space.
+- Such structure uses the markov property. (Markov property states that the future states are independent of past ones given the current state).
+- We also know that the HMM extend the chains by allowing the hidden states.
+- HMM are Markov chains where the states are not dirctly observable.
+
+![Alt text](./HMM_1.png "Hidden markov model")
+
+- HMM has 2 components
+    - Underlying Markov chain over states X.
+    - Observable outputs (effects of the states) at each time step. These outputs are often called emissions.
+
+### HMM PARAMETERS
+
+- Intial distribution P(X<sub>1</sub>) which in this case is numpy 2-D array 1 X 41. 41 since the number of rooms as shown in the floor plan. Every room is assigned the zero value except outside is set to 1. 1 here represents that no one inside the building and everyone is outside the building. This also represents that all the lights are off (0) inside the building and only the outside light is on (1).
+
+- Transition probabilities P(X<sub>t</sub>| X<sub>t-1</sub>): which is represented by a 41 x 41 matrix. This represents the probablity of a person moving from room A to room B.
+
+    - While calculating the transition probabilties, an assumption was made that people could only move to a limited number of rooms. This assumption was represented as a graph.
+
+    - The whole data was divided into 5 sections of 500 and Transition matix was calculated separately for each of the section. The rationale behind that is as the electricity charges vary in the data. The model was better able to learn this change rather than in the case for only a single transiton matrix is calculated for the whole day. This also represents another assumption of HMM that the transition probabilities stay constant for 500 time units.
+
+- Emission Probabilities P(E<sub>t</sub>|X<sub>t</sub>): which is represented by the reliability of the sensors i.e. the probablity the sensor is giving the correct value of the count of the people.
+
+#### ASSUMPTIONS
+
+- This model follows the independence assumptions of the hidden markov model.
+    - A room state is independent of all the past room states and all the past evidence (sensor) given the previous room state. (Markove property)
+    - X<sub>t</sub> ⊥ X<sub>1</sub>, ..., X<sub>t-2</sub>,E<sub>1</sub>, ..., E<sub>t-2</sub>|X<sub>t-1</sub>
+
+    - Evidence (Sensor) is independent of all past evidence (sensor) and all past room states given the current room state (independence of observations)
+    - E<sub>t</sub> ⊥ X<sub>1</sub>, ... , X<sub>t-1</sub>,E<sub>1</sub>, ... , E<sub>t-1</sub> | X<sub>1</sub>
+    - Transition and emission probabilities are the same for 500 values of t as opposed to all values. (stationary process).
+
+### HOW THE MODEL WORKS
+
+- file_name: example_solution_latest.py
+- Start_states: is a 1 x 41. where 41 corresponds to the state of the room. all the 40 states of room is set to zero and outside is set to one. This represents the starting state that no one is in the building.
+- state: represents the current state of the room at any given t.
+- previous_state: represents the previous state at t-1.
+- threshold: 0.2, this is a hyperparameter used to decide if we want to replace the current state value of a room with the reliability value of the sensor. This will be explained later.
+- reads the relvant transiton matrix keeping in mind the value of t. (the method to calculate the transition matrix is explained later)
+- reads the reliabilties of the sensors. (the method to calculate the reliabilties of the sensor is explained later)
+- replaces the sensor values of motion and no motion with 1 and 0 respectively.
+- To update the states of all the rooms for any value of t, it iterates over all the sensors and 
+    - first checks if the sensor value is not equal to None (None represents that the sensor stopped working). if the sensor is working, then the states of the rooms is simply updated using the following formula:
+        - state = previous_state @ transtion_matrix<sub>t</sub>
+            - @ here represents a matrix multiplication.
+            - shape of state = (1x41), shape of previous_state = (1x41), shape of transition_matrix = (41x41).
+    - else if the sensor is not working, we set the set of that room to zero and update the states using the same above formula.
+- After that, it takes into account the values that the robots are reporting. it replaces the state of the room for which robot is reporting the count of people.
+- After that it takes into account the values of the sensors.
+    - iterates over all the non_door_sensors
+        - it finds the difference between the previous state of the room and the current state of the room and if it is less than the threshold (hyperparameter) value of 0.2 then the current state value of the room is replaced by the sensor value (reliability of the sensor).
+        - Hyperparameter threshold was fine-tuned manually and it is a way for the model to make a decision when to incorporate the values of the sensors.
+- Prediction is made for all the rooms. The decision to turn a light on or off of a room is again made on the basis of a hyperparameter values. which again where fine tuned to reduce the cost of the electricity keeping in view both the penalties described above.
+
+
+### CALCULATING THE RELIABILITY OF THE SENSORS
+- file_name: version_final.py.
+- One of the first steps was to calculate the reliability of the sensors i.e. the number of times the sensor is predicting the correct values for count of people in the room.
+    - Replace the motion and non_motion values with 1 and 0 respectively.
+    - Create a numpy array for the dataset with the columns of sensors and also the ground truth.
+    - Create a list of all the sensors.
+    - Create a dictionary of sensors against their locations.
+    - iterate over the list of sensors.
+        - Pick a sensor compare its value at the same time unit against the ground truth value using the dictionary of sensors and locations.
+        - if the value of both the columns i.e. the sensor column and ground truth value match then count them.
+        - find the total number of values for the sensor.
+        - Divide the count with the total to find the probability that the sensor is giving the correct value.
+        - Subtract the probablity from 1 to get the probability that the sensor is not giving the correct value.
+        - move to the next sensor.
+    - store all the probablities of all the sensors in a file 'reliability_sensors.csv' as these are our parameters for the model.
+
+### CALCULATING THE TRANSITIONS AND CREATING TRANSITIONS MATRIX
+
+- Create a 2-d numpy array of shape 41x41 with all values initialized to zero.
+- set the value of begin = 0 and set the value of end = 500 as we are dividing the day into 5 parts.
+- iterate for 5 times.
+    - extract the subset of data for the current time frame.
+    - iterate for 500 times.
+        - iterate over all the keys of the graph.
+            - check the values of the current room column from top to bottom and check if we find an instance where the first value is greater than the second value. (remember we are checking vertically).
+            - if we do find an instance like this, we find the difference.
+            - After finding the difference, we try to figure out in which rooms people moved to from the current room they were in. We do this using the graph we have declared earlier.
+            - The graph tells us that for any room, where the people can move to. So for a room node in a graph, the child of that node are the possible rooms that a person can move to.
+            - For each child, we check if the value of the child increased in the next time value than the value of the child in the current time step. if this was the case, we increament the value in the transition matrix such that the row index is the current room and column index is the room where people moved to.
+        - iterate over all the keys in the graph, now calculate the probability from one room to another, for now we will not calculate the probablity of staying in the same room.
+            - To calculate the probability of a person moving from one room to another
+                - we first calculate the sum of that room column from the ground truth. Tis represents the total number of people in a room over a period of 500 time units.
+                - then we divide the row of the transition matrix for this room with the sum we calculated in the first step.
+                - Lastly, to calculate the probabilities of staying in the same room is done by adding the row of the matrix for a room and subtracting it from 1.
+- This whole process generates a transition csv file which represents the transition matrix for the 500 units of time.   
+
+# RESULTS
+
+# Assignment Score
+## Cost: 66,453.66
+## Time: 116
