@@ -1,0 +1,27 @@
+
+COMP9418_Assignment_2/.nonadmin
+COMP9418_Assignment_2/*.dll
+COMP9418_Assignment_2/conda-meta/*
+COMP9418_Assignment_2/DLLs/
+COMP9418_Assignment_2/include/
+COMP9418_Assignment_2/Lib/
+COMP9418_Assignment_2/Library/
+COMP9418_Assignment_2/libs/
+COMP9418_Assignment_2/LICENSE_PYTHON.txt
+COMP9418_Assignment_2/Menu/
+COMP9418_Assignment_2/python.exe
+COMP9418_Assignment_2/python.pdb
+COMP9418_Assignment_2/python39.pdb
+COMP9418_Assignment_2/pythonw.exe
+COMP9418_Assignment_2/pythonw.pdb
+COMP9418_Assignment_2/Scripts/
+COMP9418_Assignment_2/share/
+COMP9418_Assignment_2/tcl/
+COMP9418_Assignment_2/Tools/
+COMP9418_Assignment_2/venvlauncher.exe
+COMP9418_Assignment_2/venvwlauncher.exe
+COMP9418_Assignment_2/qt.conf
+COMP9418_Assignment_2/sip/
+COMP9418_Assignment_2/vcruntime140.dll.c~.conda_trash
+COMP9418_Assignment_2/bin/
+COMP9418_Assignment_2/Shared Libraries/
